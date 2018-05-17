@@ -30,6 +30,6 @@ class Dataset:
             for j in range(i, num_cities):
                 dist_matrix[i][j] = np.sqrt(np.power(city_infos[i]['x'] - city_infos[j]['x'], 2) + np.power(city_infos[i]['y'] - city_infos[j]['y'], 2))   
         dist_matrix = dist_matrix + dist_matrix.T
-        return dist_matrix
+        return dist_matrix, num_cities
 
         
