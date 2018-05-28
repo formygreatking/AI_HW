@@ -3,13 +3,13 @@ from pre_data import Dataset
 import numpy as np
 import time
 
-DATA_PATH = 'TSP/TSP10cities.tsp'
+DATA_PATH = 'TSP/TSP25cities.tsp'
 city_infos = Dataset.get_city_info(DATA_PATH)
-dist_matrix, num_citises = Dataset.get_dist_matrix(city_infos)
+dist_matrix, num_cities = Dataset.get_dist_matrix(city_infos)
 min_dist = []
 visit_squences = []
 
-for i in range(num_citises):
+for i in range(num_cities):
     dst = 0
     visit_squence = []
     visit_flag = np.zeros(len(city_infos))
@@ -20,7 +20,7 @@ for i in range(num_citises):
     while 1:  
         mini = -1
         dst_temp = 1e10
-        for j in range(num_citises):
+        for j in range(num_cities):
             if visit_flag[j] == 0 and dist_matrix[i][j] < dst_temp and not i == j:
                 dst_temp = dist_matrix[i][j]
                 mini = j
