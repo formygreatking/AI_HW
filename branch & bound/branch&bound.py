@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from pre_data import Dataset
 from utils import Node, PriorityQueue
-import numpy as np
 import time
 import sys
 
@@ -20,7 +19,7 @@ def bound(dist_mat, node):
     _bound = 0
 
     n = len(dist_mat)
-    determined, last = path[:-1], path[-1]
+    last = path[-1]
     # remain is index based
     remain = filter(lambda x: x not in path, range(n))
 
@@ -31,7 +30,7 @@ def bound(dist_mat, node):
     # for the last item
     _bound += min([dist_mat[last][i] for i in remain])
 
-    p = [path[0]] + remain
+    p = [path[0]] + list(remain)
     # for the undetermined nodes
     for r in remain:
         _bound += min([dist_mat[r][i] for i in filter(lambda x: x != r, p)])
@@ -42,5 +41,39 @@ def travel(dist_mat, startcity=0):
     u = Node()
     pq = PriorityQueue()
     opt_len = 0
+    v = Node(level=0, path=[0])
+    min_len = sys.maxsize
+    v.bound = bound(dist_mat, v)
+    pq.put(v)
+    while not pq.empty():
+        v = pq.get()
+        if v.bound < min_len:
+            u.level = v.level + 1
+            for i in filter(lambda x: x not in v.path, range(1,num_cities)):
+                u.path = v.path[:]
+                u.path.append(i)
+                if u.level == num_cities - 2:
+                    l = set(range(1, num_cities)) - set(u.path)
+                    u.path.append(list(l)[0])
+                    u.path.append(0)
+                    
+                    _len = length(dist_mat, u)
+                    if _len < min_len:
+                        min_len = _len
+                        opt_len = _len
+                        optimal_tour = u.path[:]
+                else:
+                    u.bound = bound(dist_mat, u)
+                    if u.bound < min_len:
+                        pq.put(u)
+                # make a new node at each iteration!
+                u = Node(level=u.level)
+                
+    return optimal_tour, opt_len
     
+if __name__=='__main__':
+    start_cpu = time.clock()
+    print(travel(dist_matrix))
+    end_cpu = time.clock()
+    print('cpu time: ', end_cpu-start_cpu)
     
