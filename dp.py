@@ -7,8 +7,6 @@ import sys
 DATA_PATH = 'TSP/TSP10cities.tsp'
 city_infos = Dataset.get_city_info(DATA_PATH)
 dist_matrix, num_cities = Dataset.get_dist_matrix(city_infos)
-min_dist = []
-visit_squences = []
 cols = 1<<(num_cities-1)
 dp_list = np.zeros((num_cities, cols))
 minDis = sys.maxsize
