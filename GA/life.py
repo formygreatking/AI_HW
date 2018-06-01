@@ -2,17 +2,17 @@
 import random
 
 class Life(object):
-    def __init__(self, gene_len, gene=None):
+    def __init__(self, env, gene=None):
         
-        self.gene_len = gene_len
+        self.env = env
         
         if gene == None:
-            self.__randGene()
+            self.gene = self.__randGene()
         else:
             self.gene = gene
     
     def __randGene(self):
-        lst = range(self.gene_len)
+        lst = list(range(self.env.g_len))
         random.shuffle(lst)
         return lst
     

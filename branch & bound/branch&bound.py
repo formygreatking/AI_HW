@@ -71,7 +71,14 @@ def travel(dist_mat, startcity=0):
     
 if __name__=='__main__':
     start_cpu = time.clock()
-    print(travel(dist_matrix))
+    opt_path, opt_len = travel(dist_matrix)
+    dst = 0
+    for i in range(10):
+        dst += dist_matrix[opt_path[i]][opt_path[i+1]]
+    dst += dist_matrix[opt_path[10]][opt_path[0]]
+    print(dst)
+    print(opt_path)
+    print(opt_len)
     end_cpu = time.clock()
     print('cpu time: ', end_cpu-start_cpu)
     
