@@ -7,6 +7,7 @@ class Dataset:
         self.path = path
     
     def get_city_info(path):
+        pList = []
         city_infos = []
         with open(path, 'r') as f:
             dataset = f.readlines()
@@ -17,11 +18,13 @@ class Dataset:
             if len(data) > 1:
                 data = data.strip()
                 data = data.split(' ')
+                point = [int(data[1]), int(data[2])]
+                pList.append(point)
                 city['id'] = data[0]
                 city['x'] = int(data[1])
                 city['y'] = int(data[2])
                 city_infos.append(city)
-        return city_infos
+        return city_infos, pList
     
     def get_dist_matrix(city_infos):
         num_cities = len(city_infos)
