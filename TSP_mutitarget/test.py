@@ -7,6 +7,7 @@ from PointerNet import PointerNet
 import argparse
 import torch
 from torch.autograd import Variable
+import torch.optim as optim
 
 parser = argparse.ArgumentParser(description="Pytorch implementation of Pointer-Net")
 
@@ -29,6 +30,8 @@ parser.add_argument('--nof_lstms', type=int, default=2, help='Number of LSTM lay
 parser.add_argument('--dropout', type=float, default=0., help='Dropout value')
 parser.add_argument('--bidir', default=True, action='store_true', help='Bidirectional')
 
+params = parser.parse_args()
+
 DATA_PATHA = 'TSPA100cities.tsp'
 city_infos_A, ListA = Dataset.get_city_info(DATA_PATHA)
 cost_mat_A = Dataset.get_dist_matrix(city_infos_A)
@@ -36,10 +39,17 @@ cost_mat_A = Dataset.get_dist_matrix(city_infos_A)
 DATA_PATHB = 'TSPB100cities.tsp'
 city_infos_B, ListB = Dataset.get_city_info(DATA_PATHB)
 cost_mat_B = Dataset.get_dist_matrix(city_infos_B)
-
 num_cities = len(cost_mat_A)
 
-params = parser.parse_args()
+def getReward(trajectory):
+     reward = 0.0
+     for i in range(len(trajectory)-1):
+         index_1 = trajectory[i]
+         index_2 = trajectory[i+1]
+         reward += cost_mat_A[index_1][index_2] + cost_mat_B[index_1][index_2]
+     reward += cost_mat_A[len(trajectory)-1][trajectory[0]] + cost_mat_B[len(trajectory)-1][trajectory[0]]
+     return -reward
+     
 
 if params.gpu and torch.cuda.is_available():
     USE_CUDA = True
@@ -53,9 +63,16 @@ model = PointerNet(params.embedding_size,
                    params.dropout,
                    params.bidir)
 
+optimizer = optim.Adam(filter(lambda p: p.requires_grad,
+                                model.parameters()),
+                         lr=params.lr)
 ListA = torch.Tensor(ListA)
 trainA = Variable(ListA)
-print(trainA)
-o, p = model(trainA)
-print(p)
+trainA = trainA.view(1, 100, 2)
+ListB = torch.Tensor(ListA)
+trainB = Variable(ListB)
+trainB = trainB.view(1, 100, 2)
+probs, o, p = model(trainA, trainB)
+print(probs)
+#print(getReward(p.detach().numpy()[0]))
 

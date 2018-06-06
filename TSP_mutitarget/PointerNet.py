@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
 from torch.nn import Parameter
@@ -197,6 +196,7 @@ class Decoder(nn.Module):
 
         outputs = []
         pointers = []
+        probs = []
 
         def step(x, hidden):
             """
@@ -248,11 +248,12 @@ class Decoder(nn.Module):
 
             outputs.append(outs.unsqueeze(0))
             pointers.append(indices.unsqueeze(1))
+            probs.append(max_probs.detach().numpy())
 
         outputs = torch.cat(outputs).permute(1, 0, 2)
         pointers = torch.cat(pointers, 1)
 
-        return (outputs, pointers), hidden
+        return (probs, outputs, pointers), hidden
 
 
 class PointerNet(nn.Module):
@@ -279,6 +280,7 @@ class PointerNet(nn.Module):
         self.embedding_dim = embedding_dim
         self.bidir = bidir
         self.embedding = nn.Linear(2, embedding_dim)
+        self.embedding_inputs = nn.Linear(2*embedding_dim, embedding_dim)
         self.encoder = Encoder(embedding_dim,
                                hidden_dim,
                                lstm_layers,
@@ -290,7 +292,7 @@ class PointerNet(nn.Module):
         # Initialize decoder_input0
         nn.init.uniform(self.decoder_input0, -1, 1)
 
-    def forward(self, inputs):
+    def forward(self, inputs_1, inputs_2):
         """
         PointerNet - Forward-pass
 
@@ -298,13 +300,16 @@ class PointerNet(nn.Module):
         :return: Pointers probabilities and indices
         """
 
-        batch_size = inputs.size(0)
-        input_length = inputs.size(1)
+        batch_size = inputs_1.size(0)
+        input_length = inputs_1.size(1)
 
         decoder_input0 = self.decoder_input0.unsqueeze(0).expand(batch_size, -1)
 
-        inputs = inputs.view(batch_size * input_length, -1)
-        embedded_inputs = self.embedding(inputs).view(batch_size, input_length, -1)
+        inputs_1 = inputs_1.view(batch_size * input_length, -1)
+        inputs_2 = inputs_2.view(batch_size * input_length, -1)
+        embedded_inputs_1 = self.embedding(inputs_1).view(batch_size, input_length, -1)
+        embedded_inputs_2 = self.embedding(inputs_2).view(batch_size, input_length, -1)
+        embedded_inputs = self.embedding_inputs(torch.cat([embedded_inputs_1, embedded_inputs_2], dim=-1))
 
         encoder_hidden0 = self.encoder.init_hidden(embedded_inputs)
         encoder_outputs, encoder_hidden = self.encoder(embedded_inputs,
@@ -315,9 +320,9 @@ class PointerNet(nn.Module):
         else:
             decoder_hidden0 = (encoder_hidden[0][-1],
                                encoder_hidden[1][-1])
-        (outputs, pointers), decoder_hidden = self.decoder(embedded_inputs,
+        (max_probs, outputs, pointers), decoder_hidden = self.decoder(embedded_inputs,
                                                            decoder_input0,
                                                            decoder_hidden0,
                                                            encoder_outputs)
 
-        return  outputs, pointers
+        return  max_probs, outputs, pointers
