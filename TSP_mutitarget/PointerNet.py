@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import Parameter
 import torch.nn.functional as F
+from torch.distributions import Categorical
 
 
 class Encoder(nn.Module):
@@ -236,7 +237,11 @@ class Decoder(nn.Module):
             masked_outs = outs * mask
 
             # Get maximum probabilities and indices
-            max_probs, indices = masked_outs.max(1)
+            m = Categorical(masked_outs)
+            indices = m.sample()
+            log_probs = m.log_prob(indices)
+#            max_probs, indices = masked_outs.max(1)
+#            print(log_probs, indices)
             one_hot_pointers = (runner == indices.unsqueeze(1).expand(-1, outs.size()[1])).float()
 
             # Update mask to ignore seen indices
@@ -248,7 +253,7 @@ class Decoder(nn.Module):
 
             outputs.append(outs.unsqueeze(0))
             pointers.append(indices.unsqueeze(1))
-            probs.append(max_probs.detach().numpy())
+            probs.append(log_probs)
 
         outputs = torch.cat(outputs).permute(1, 0, 2)
         pointers = torch.cat(pointers, 1)
@@ -279,7 +284,7 @@ class PointerNet(nn.Module):
         super(PointerNet, self).__init__()
         self.embedding_dim = embedding_dim
         self.bidir = bidir
-        self.embedding = nn.Linear(2, embedding_dim)
+        self.embedding = nn.Linear(2, 64)
         self.embedding_inputs = nn.Linear(2*embedding_dim, embedding_dim)
         self.encoder = Encoder(embedding_dim,
                                hidden_dim,
@@ -288,6 +293,8 @@ class PointerNet(nn.Module):
                                bidir)
         self.decoder = Decoder(embedding_dim, hidden_dim)
         self.decoder_input0 = Parameter(torch.FloatTensor(embedding_dim), requires_grad=False)
+        self.saved_log_probs = []
+        self.rewards = []
 
         # Initialize decoder_input0
         nn.init.uniform(self.decoder_input0, -1, 1)
@@ -307,9 +314,12 @@ class PointerNet(nn.Module):
 
         inputs_1 = inputs_1.view(batch_size * input_length, -1)
         inputs_2 = inputs_2.view(batch_size * input_length, -1)
+#        embedded_inputs_1 = self.embedding(inputs_1).view(batch_size, input_length, -1)
+#        embedded_inputs_2 = self.embedding(inputs_2).view(batch_size, input_length, -1)
         embedded_inputs_1 = self.embedding(inputs_1).view(batch_size, input_length, -1)
         embedded_inputs_2 = self.embedding(inputs_2).view(batch_size, input_length, -1)
-        embedded_inputs = self.embedding_inputs(torch.cat([embedded_inputs_1, embedded_inputs_2], dim=-1))
+#        embedded_inputs = self.embedding_inputs(torch.cat([embedded_inputs_1, embedded_inputs_2], dim=-1))
+        embedded_inputs = torch.cat([embedded_inputs_1, embedded_inputs_2], dim=-1)
 
         encoder_hidden0 = self.encoder.init_hidden(embedded_inputs)
         encoder_outputs, encoder_hidden = self.encoder(embedded_inputs,
@@ -320,9 +330,10 @@ class PointerNet(nn.Module):
         else:
             decoder_hidden0 = (encoder_hidden[0][-1],
                                encoder_hidden[1][-1])
-        (max_probs, outputs, pointers), decoder_hidden = self.decoder(embedded_inputs,
+        (log_probs, outputs, pointers), decoder_hidden = self.decoder(embedded_inputs,
                                                            decoder_input0,
                                                            decoder_hidden0,
                                                            encoder_outputs)
+        self.saved_log_probs.append(log_probs)
 
-        return  max_probs, outputs, pointers
+        return  outputs, pointers

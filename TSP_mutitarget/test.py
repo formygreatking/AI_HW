@@ -25,10 +25,13 @@ parser.add_argument('--gpu', default=False, action='store_true', help='Enable gp
 parser.add_argument('--nof_points', type=int, default=10, help='Number of points in TSP')
 # Network
 parser.add_argument('--embedding_size', type=int, default=128, help='Embedding size')
-parser.add_argument('--hiddens', type=int, default=512, help='Number of hidden units')
-parser.add_argument('--nof_lstms', type=int, default=2, help='Number of LSTM layers')
+parser.add_argument('--hiddens', type=int, default=256, help='Number of hidden units')
+parser.add_argument('--nof_lstms', type=int, default=1, help='Number of LSTM layers')
 parser.add_argument('--dropout', type=float, default=0., help='Dropout value')
 parser.add_argument('--bidir', default=True, action='store_true', help='Bidirectional')
+
+parser.add_argument('--max_eposide', default=100, type=int, help='Max eposide')
+parser.add_argument('--sample_size', default=20, type=int, help='Sample size')
 
 params = parser.parse_args()
 
@@ -50,6 +53,21 @@ def getReward(trajectory):
      reward += cost_mat_A[len(trajectory)-1][trajectory[0]] + cost_mat_B[len(trajectory)-1][trajectory[0]]
      return -reward
      
+def updateParameters():
+     loss = []
+     rewards = torch.Tensor(model.rewards)
+     rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
+     if USE_CUDA:
+          rewards = rewards.cuda()
+     for log_prob, reward in zip(model.saved_log_probs, rewards):
+          loss.append(-sum(log_prob)*(reward))
+     optimizer.zero_grad()
+     loss = torch.cat(loss).sum()/len(loss)
+     print(loss)
+     loss.backward()
+     optimizer.step()
+     del model.rewards[:]
+     del model.saved_log_probs[:]         
 
 if params.gpu and torch.cuda.is_available():
     USE_CUDA = True
@@ -62,17 +80,29 @@ model = PointerNet(params.embedding_size,
                    params.nof_lstms,
                    params.dropout,
                    params.bidir)
-
-optimizer = optim.Adam(filter(lambda p: p.requires_grad,
-                                model.parameters()),
-                         lr=params.lr)
+     
+optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=params.lr)
+eps = np.finfo(np.float32).eps.item()
 ListA = torch.Tensor(ListA)
 trainA = Variable(ListA)
 trainA = trainA.view(1, 100, 2)
 ListB = torch.Tensor(ListA)
 trainB = Variable(ListB)
 trainB = trainB.view(1, 100, 2)
-probs, o, p = model(trainA, trainB)
-print(probs)
-#print(getReward(p.detach().numpy()[0]))
 
+if USE_CUDA:
+     model = model.cuda()
+     trainA = trainA.cuda()
+     trainB = trainB.cuda()
+
+for i_eposide in range(params.max_eposide):
+     for i in range(params.sample_size):
+#          t_s = time.clock()
+          o, p = model(trainA, trainB)
+          model.rewards.append(getReward(p[0].cpu().detach().numpy()))
+#          t_e = time.clock()
+#          print('time: ', t_e-t_s)
+          #print(sum(model.saved_log_probs[0]))
+     print(i_eposide)
+     print(np.mean(model.rewards))
+     updateParameters()

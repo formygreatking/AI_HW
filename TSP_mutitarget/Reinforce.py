@@ -51,7 +51,6 @@ eps = np.finfo(np.float32).eps.item()
 def select_action(state):
     state = torch.from_numpy(state).float().unsqueeze(0)
     probs = policy(state)
-    print(probs)
     m = Categorical(probs)
     action = m.sample()
     policy.saved_log_probs.append(m.log_prob(action))
@@ -71,6 +70,7 @@ def finish_episode():
         policy_loss.append(-log_prob * reward)
     optimizer.zero_grad()
     policy_loss = torch.cat(policy_loss).sum()
+    print(policy_loss)
     policy_loss.backward()
     optimizer.step()
     del policy.rewards[:]
@@ -95,7 +95,7 @@ def main():
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
                 i_episode, t, running_reward))
-        if running_reward > env.spec.reward_threshold:
+        if running_reward > 0:
             print("Solved! Running reward is now {} and "
                   "the last episode runs to {} time steps!".format(running_reward, t))
             break
